@@ -19,17 +19,45 @@ let atualizandoCarrinho = false;
 
 // Formato:
 // 55 + DDD + número
-const NUMERO_DE_WHATSAPP = '';
+const NUMERO_DE_WHATSAPP = '5587991675203';
+
+
+// ======================================================
+// CAIXA MULTIESTADO
+// ======================================================
+
+// IMPORTANTE:
+// Estes valores precisam ser exatamente os IDs
+// dos estados configurados no Editor Wix.
+
+const ESTADO_CARRINHO_VAZIO = 'vazio';
+const ESTADO_CARRINHO_PRODUTOS = 'produtos';
 
 
 // ======================================================
 // INICIALIZAÇÃO DA PÁGINA
 // ======================================================
 
-$w.onReady(function () {
+$w.onReady(async function () {
+
+    /*
+     * Evita mostrar rapidamente o estado errado
+     * enquanto o Wix ainda consulta o carrinho.
+     */
+    $w('#boxEstadoCarrinho').hide();
+
 
     configurarRepetidor();
-    sincronizarCarrinho();
+
+
+    await sincronizarCarrinho();
+
+
+    /*
+     * Depois que sabemos se há produtos ou não,
+     * mostramos a Caixa Multiestado.
+     */
+    $w('#boxEstadoCarrinho').show();
 
 });
 
@@ -58,6 +86,7 @@ function configurarRepetidor() {
             if (atualizandoCarrinho) {
                 return;
             }
+
 
             /*
              * Não utilizamos diretamente:
@@ -289,8 +318,11 @@ async function sincronizarCarrinho() {
             currentCart?.lineItems || [];
 
 
-        // Atualiza produtos
-        configurarCarrinhoParaRepetidor(
+        /*
+         * Atualiza os produtos e também decide
+         * qual estado da Caixa Multiestado mostrar.
+         */
+        await configurarCarrinhoParaRepetidor(
             lineItems
         );
 
@@ -317,7 +349,11 @@ async function sincronizarCarrinho() {
         carrinho = null;
 
 
-        configurarCarrinhoParaRepetidor(
+        /*
+         * Em caso de erro, tratamos visualmente
+         * como carrinho vazio.
+         */
+        await configurarCarrinhoParaRepetidor(
             []
         );
 
@@ -333,7 +369,7 @@ async function sincronizarCarrinho() {
 // TRANSFORMA O CARRINHO EM DADOS DO REPETIDOR
 // ======================================================
 
-function configurarCarrinhoParaRepetidor(
+async function configurarCarrinhoParaRepetidor(
     lineItems
 ) {
 
@@ -346,12 +382,32 @@ function configurarCarrinhoParaRepetidor(
         lineItems.length === 0
     ) {
 
-        $w('#boxVazio').expand();
+        /*
+         * Limpa qualquer item que ainda possa estar
+         * armazenado visualmente no repetidor.
+         */
+        $w('#repCarrinho').data = [];
 
+
+        /*
+         * Agora não usamos mais:
+         *
+         * #boxVazio.expand()
+         * #boxVazio.collapse()
+         *
+         * Quem controla a interface é a Caixa Multiestado.
+         */
+        await $w('#boxEstadoCarrinho')
+            .changeState(
+                ESTADO_CARRINHO_VAZIO
+            );
+
+
+        // Desativa finalização
         $w('#btnFinalizarCompra').disable();
+
         $w('#btnFinalizarCompra').link = '';
 
-        $w('#repCarrinho').data = [];
 
         return;
     }
@@ -361,10 +417,29 @@ function configurarCarrinhoParaRepetidor(
     // CARRINHO COM PRODUTOS
     // ==================================================
 
-    $w('#boxVazio').collapse();
+    /*
+     * Mostra o estado "produtos".
+     *
+     * Dentro dele você possui:
+     *
+     * #boxProdutos
+     *     └── pilha
+     *          ├── #repCarrinho
+     *          └── botão continuar comprando
+     */
+    await $w('#boxEstadoCarrinho')
+        .changeState(
+            ESTADO_CARRINHO_PRODUTOS
+        );
 
+
+    // Libera botão para finalizar
     $w('#btnFinalizarCompra').enable();
 
+
+    // ==================================================
+    // MONTA OS DADOS DO REPETIDOR
+    // ==================================================
 
     const data = lineItems.map(
         (item, index) => {
@@ -968,6 +1043,14 @@ async function removerDoCarrinho(
         );
 
 
+        /*
+         * Busca novamente o carrinho.
+         *
+         * Se este for o último produto,
+         * configurarCarrinhoParaRepetidor()
+         * automaticamente mudará para
+         * o estado "vazio".
+         */
         await sincronizarCarrinho();
 
 
@@ -1001,6 +1084,7 @@ async function removerDoCarrinho(
         } catch (error) {
 
             // Item já removido da interface.
+
         }
 
     }
