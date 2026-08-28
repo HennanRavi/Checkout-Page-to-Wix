@@ -628,7 +628,6 @@ function gerarMensagemWhatsApp(
         $w('#btnFinalizarCompra').link = '';
 
         return;
-
     }
 
 
@@ -637,15 +636,13 @@ function gerarMensagemWhatsApp(
     // ==================================================
 
     const total = pedidos.reduce(
-        (sum, item) => {
+        (soma, item) => {
 
             const preco =
                 Number(item.price || 0);
 
-
             const quantidade =
                 Number(item.quantity || 1);
-
 
             const subtotal =
                 Number(
@@ -653,8 +650,7 @@ function gerarMensagemWhatsApp(
                     preco * quantidade
                 );
 
-
-            return sum + subtotal;
+            return soma + subtotal;
 
         },
         0
@@ -667,9 +663,9 @@ function gerarMensagemWhatsApp(
 
     const quantidadeTotal =
         pedidos.reduce(
-            (sum, item) => {
+            (soma, item) => {
 
-                return sum +
+                return soma +
                     Number(
                         item.quantity || 0
                     );
@@ -685,21 +681,19 @@ function gerarMensagemWhatsApp(
 
     const pesoTotal =
         pedidos.reduce(
-            (sum, item) => {
+            (soma, item) => {
 
                 const pesoUnitario =
                     Number(
                         item.weight || 0
                     );
 
-
                 const quantidade =
                     Number(
                         item.quantity || 1
                     );
 
-
-                return sum +
+                return soma +
                     (
                         pesoUnitario *
                         quantidade
@@ -711,12 +705,17 @@ function gerarMensagemWhatsApp(
 
 
     // ==================================================
-    // FORMATA CADA PRODUTO
+    // MONTA CADA ITEM DO PEDIDO
     // ==================================================
 
     const itensFormatados =
         pedidos.map(
             (item, index) => {
+
+                const nome =
+                    item.name ||
+                    'Produto sem nome';
+
 
                 const preco =
                     Number(
@@ -737,48 +736,95 @@ function gerarMensagemWhatsApp(
                     );
 
 
-                let texto =
-                    `${index + 1}️⃣ *${item.name || 'Produto sem nome'}*\n`;
+                const sku =
+                    item.sku ||
+                    'Não informado';
 
 
-                // Variações
-                const opcoes =
-                    extrairOpcoes(item);
+                let texto = '';
 
 
-                if (opcoes) {
+                // Número + nome do produto
+                texto +=
+                    `*${index + 1}. ${nome}*\n`;
 
-                    texto +=
-                        `   • Variação: ${opcoes}\n`;
+
+                // ==================================================
+                // VARIAÇÕES / OPÇÕES
+                // ==================================================
+
+                if (
+                    Array.isArray(item.options) &&
+                    item.options.length > 0
+                ) {
+
+                    item.options.forEach(
+                        (opcao) => {
+
+                            const nomeOpcao =
+                                opcao.option || '';
+
+                            const selecao =
+                                opcao.selection || '';
+
+
+                            if (
+                                nomeOpcao &&
+                                selecao
+                            ) {
+
+                                texto +=
+                                    `• ${nomeOpcao}: ${selecao}\n`;
+
+                            } else if (selecao) {
+
+                                texto +=
+                                    `• ${selecao}\n`;
+
+                            }
+
+                        }
+                    );
 
                 }
 
 
-                // SKU
+                // Código / SKU
                 texto +=
-                    `   • Código: ${item.sku || 'Sem SKU'}\n`;
+                    `• Código: ${sku}\n`;
 
 
-                // Preço unitário
+                // Espaço antes dos valores
+                texto += '\n';
+
+
+                // Quantidade x preço unitário
                 texto +=
-                    `   • Unitário: ${formatarMoeda(preco)}\n`;
+                    `${quantidade} un. × ${formatarMoeda(preco)}\n`;
 
 
-                // Quantidade
+                // Subtotal daquele produto
                 texto +=
-                    `   • Quantidade: ${quantidade}\n`;
-
-
-                // Subtotal
-                texto +=
-                    `   • Subtotal: ${formatarMoeda(subtotal)}\n`;
+                    `*Subtotal: ${formatarMoeda(subtotal)}*`;
 
 
                 return texto;
 
             }
         )
-        .join('\n');
+        .join(
+            '\n\n────────────────\n\n'
+        );
+
+
+    // ==================================================
+    // PESO FORMATADO
+    // ==================================================
+
+    const pesoFormatado =
+        pesoTotal
+            .toFixed(1)
+            .replace('.', ',');
 
 
     // ==================================================
@@ -787,33 +833,34 @@ function gerarMensagemWhatsApp(
 
     const mensagem =
 
-        `*NOVO PEDIDO*\n\n` +
+        `🛒 *NOVO PEDIDO*\n\n` +
 
-        `*TOTAL GERAL: ${formatarMoeda(total)}*\n` +
+        `Olá! Gostaria de finalizar este pedido.\n\n` +
 
-        `----------------------------------\n\n` +
-
-        `*DETALHES DOS ITENS:*\n\n` +
+        `━━━━━━━━━━━━━━━━\n` +
+        `*ITENS DO PEDIDO*\n` +
+        `━━━━━━━━━━━━━━━━\n\n` +
 
         itensFormatados +
 
-        `\n----------------------------------\n` +
+        `\n\n━━━━━━━━━━━━━━━━\n` +
+        `*RESUMO DO PEDIDO*\n` +
+        `━━━━━━━━━━━━━━━━\n\n` +
 
-        `*RESUMO*\n` +
+        `📦 Produtos diferentes: ${pedidos.length}\n` +
 
-        `• Unidades: ${quantidadeTotal}\n` +
+        `🔢 Total de unidades: ${quantidadeTotal}\n` +
 
-        `• Produtos diferentes: ${pedidos.length}\n` +
+        `⚖️ Peso aproximado: ${pesoFormatado} kg\n\n` +
 
-        `• Peso total: ${pesoTotal
-            .toFixed(1)
-            .replace('.', ',')} kg\n\n` +
+        `💰 *TOTAL DO PEDIDO*\n` +
+        `*${formatarMoeda(total)}*\n\n` +
 
-        `Olá! Gostaria de finalizar este pedido.`;
+        `_Aguardo a confirmação de disponibilidade e as orientações para finalizar o pedido._`;
 
 
     // ==================================================
-    // LINK
+    // GERA LINK DO WHATSAPP
     // ==================================================
 
     const linkWhatsApp =
